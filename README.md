@@ -8,7 +8,7 @@ This project is meant to be used as a dependency or a template: you point `pi` a
 
 ```bash
 # install pi coding agent
-npm install -g @mariozechner/pi-coding-agent
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 
 # install safe coder
 pi install npm:safe-coder
