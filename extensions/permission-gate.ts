@@ -9,29 +9,150 @@
  *   requires user authorization.
  */
 
+import os from "node:os";
 import path from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
-/** Paths outside cwd that are allowed without confirmation. */
-const ALLOWED_PATHS = ["/tmp/", "/private/tmp/"];
+/** Paths outside cwd that are allowed for any file operation. */
+const ALLOWED_FILE_OPERATION_PATHS = ["/tmp", "/private/tmp"];
+
+/** Paths outside cwd that are allowed for read operations. */
+const ALLOWED_READ_PATHS = [path.join(os.homedir(), ".agents")];
+
+/** Shell targets outside cwd that are safe without confirmation. */
+const ALLOWED_BASH_PATHS = ["/dev/null"];
+
+const SHELL_OPERATORS = new Set(["|", "||", "&", "&&", ";", "(", ")", "<", ">"]);
+
+/** Resolve a target path against cwd, including shell-style home paths. */
+function resolveTargetPath(cwd: string, targetPath: string): string {
+	if (targetPath === "~") return os.homedir();
+	if (targetPath.startsWith("~/")) return path.join(os.homedir(), targetPath.slice(2));
+	if (/^~[^/]+/.test(targetPath)) return path.join(path.dirname(os.homedir()), targetPath.slice(1));
+	return path.resolve(cwd, targetPath);
+}
+
+/** True if targetPath is the same as basePath or inside it. */
+function isSameOrInsidePath(basePath: string, targetPath: string): boolean {
+	const resolvedBase = path.resolve(basePath);
+	const resolvedTarget = path.resolve(targetPath);
+	const rel = path.relative(resolvedBase, resolvedTarget);
+	return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+}
 
 /** True if targetPath, when resolved against cwd, is outside cwd. */
 function isOutsideCwd(cwd: string, targetPath: string): boolean {
-	const resolved = path.resolve(cwd, targetPath);
-	const rel = path.relative(cwd, resolved);
+	const rel = path.relative(cwd, resolveTargetPath(cwd, targetPath));
 	return rel.startsWith("..") || path.isAbsolute(rel);
 }
 
-/** True if targetPath is inside one of the allowed paths. */
-function isAllowedPath(targetPath: string): boolean {
-	const resolved = path.resolve(targetPath);
-	return ALLOWED_PATHS.some((allowed) => resolved.startsWith(allowed));
+/** True if this file operation is allowed outside cwd without confirmation. */
+function isAllowedOutsideCwdFileOperation(cwd: string, toolName: string, targetPath: string): boolean {
+	const resolved = resolveTargetPath(cwd, targetPath);
+	if (ALLOWED_FILE_OPERATION_PATHS.some((allowed) => isSameOrInsidePath(allowed, resolved))) {
+		return true;
+	}
+
+	return toolName === "read" && ALLOWED_READ_PATHS.some((allowed) => isSameOrInsidePath(allowed, resolved));
+}
+
+/** Split shell input enough to inspect path-like arguments without executing it. */
+function splitShellWords(command: string): string[] {
+	const words: string[] = [];
+	let current = "";
+	let quote: string | null = null;
+	let escaped = false;
+
+	const pushCurrent = () => {
+		if (current.length > 0) {
+			words.push(current);
+			current = "";
+		}
+	};
+
+	for (const char of command) {
+		if (escaped) {
+			current += char;
+			escaped = false;
+			continue;
+		}
+
+		if (char === "\\" && quote !== "'") {
+			escaped = true;
+			continue;
+		}
+
+		if (quote) {
+			if (char === quote) quote = null;
+			else current += char;
+			continue;
+		}
+
+		if (char === "'" || char === '"') {
+			quote = char;
+			continue;
+		}
+
+		if (/\s/.test(char)) {
+			pushCurrent();
+			continue;
+		}
+
+		if ("|&;()<>".includes(char)) {
+			pushCurrent();
+			words.push(char);
+			continue;
+		}
+
+		current += char;
+	}
+
+	if (escaped) current += "\\";
+	pushCurrent();
+	return words;
+}
+
+function normalizePathCandidate(value: string): string {
+	return value.replace(/^[([{`]+/, "").replace(/[),;`]+$/, "");
+}
+
+function looksLikeOutsideCwdReference(value: string): boolean {
+	return (
+		value === "~" ||
+		value.startsWith("~/") ||
+		/^~[^/]+/.test(value) ||
+		value.startsWith("/") ||
+		value === ".." ||
+		value.startsWith("../") ||
+		value.includes("/../")
+	);
+}
+
+function pathCandidatesFromShellWord(word: string): string[] {
+	if (SHELL_OPERATORS.has(word) || /^\d+$/.test(word)) return [];
+
+	const values = [word];
+	const equalsIndex = word.indexOf("=");
+	if (equalsIndex >= 0 && equalsIndex < word.length - 1) {
+		values.push(word.slice(equalsIndex + 1));
+	}
+
+	return values.map(normalizePathCandidate).filter(looksLikeOutsideCwdReference);
+}
+
+function isAllowedBashPath(cwd: string, targetPath: string): boolean {
+	const resolved = resolveTargetPath(cwd, targetPath);
+	return ALLOWED_BASH_PATHS.some((allowed) => path.resolve(allowed) === resolved);
+}
+
+function commandTouchesOutsideCwd(cwd: string, command: string): boolean {
+	return splitShellWords(command)
+		.flatMap(pathCandidatesFromShellWord)
+		.some((targetPath) => isOutsideCwd(cwd, targetPath) && !isAllowedBashPath(cwd, targetPath));
 }
 
 export default function (pi: ExtensionAPI) {
 	const dangerousPatterns = [/\brm\s+(-rf?|--recursive)/i, /\bsudo\b/i, /\b(chmod|chown)\b.*777/i];
-	// Heuristic: bash command likely touches paths outside cwd (absolute, ~, or ..)
-	const outsideCwdPatterns = [/(\s|^|["'`])\/\S+/, /(\s|^|["'`])~\//, /\.\.\//];
 
 	pi.on("tool_call", async (event, ctx) => {
 		const cwd = path.resolve(ctx.cwd);
@@ -42,8 +163,7 @@ export default function (pi: ExtensionAPI) {
 		if (event.toolName === "read" || event.toolName === "write" || event.toolName === "edit") {
 			const targetPath = event.input.path as string | undefined;
 			if (targetPath && isOutsideCwd(cwd, targetPath)) {
-				// Allow all file operations on /tmp without confirmation
-				if (isAllowedPath(targetPath)) {
+				if (isAllowedOutsideCwdFileOperation(cwd, event.toolName, targetPath)) {
 					return undefined;
 				}
 				reasonLabel = "Path is outside current working directory";
@@ -55,7 +175,7 @@ export default function (pi: ExtensionAPI) {
 		if (event.toolName === "bash" && !reasonLabel) {
 			const command = event.input.command as string;
 			const isDangerous = dangerousPatterns.some((p) => p.test(command));
-			const touchesOutsideCwd = outsideCwdPatterns.some((p) => p.test(command));
+			const touchesOutsideCwd = commandTouchesOutsideCwd(cwd, command);
 			if (isDangerous) {
 				reasonLabel = "Dangerous command";
 				detail = command;

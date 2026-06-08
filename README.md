@@ -24,7 +24,8 @@ pi install npm:safe-coder
   - Prompts for explicit confirmation before allowing these commands to run.
 - **Workspace boundary enforcement**
   - Blocks file tools (`read`, `write`, `edit`) when they target paths outside the current working directory where `pi` was started, unless you explicitly allow them.
-  - Flags shell commands that appear to touch absolute paths, home-relative paths (`~/`), or `../`-style traversal and asks for confirmation.
+  - Allows `read` operations under `~/.agents` without confirmation so shared Agent Skills can load from the global skills directory.
+  - Flags shell commands when parsed path arguments resolve outside the current working directory and asks for confirmation.
 - **Protected path guard**
   - Fully protects any `.env` files (no read, write, or edit allowed via tools).
   - Blocks write/edit attempts into common sensitive locations like `.git/` and `node_modules/`.
@@ -107,4 +108,3 @@ You will then see:
 
 - The TypeScript extensions currently use `// @ts-nocheck` for simplicity. You can progressively add types and strictness as needed.
 - Follow the Agent Skills and `pi` extension best practices to keep new skills and extensions small, focused, and easy to review for safety.
-
