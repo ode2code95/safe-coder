@@ -4,23 +4,78 @@
  *
  * - Prompts for confirmation before potentially dangerous bash commands
  *   (rm -rf, sudo, chmod/chown 777).
- * - Any file operation (read, write, edit, bash) that touches paths outside
+ * - Any file operation (read, write, edit) that touches paths outside
  *   the current working directory (ctx.cwd, i.e. where pi was started)
  *   requires user authorization.
+ *
+ * Configuration is read from ~/.pi/agent/safe-coder.json at startup.
+ * See README.md for details.
  */
 
 import os from "node:os";
 import path from "node:path";
+import fs from "node:fs";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
-/** Paths outside cwd that are allowed for any file operation. */
-const ALLOWED_FILE_OPERATION_PATHS = ["/tmp", "/private/tmp"];
+// ── Built-in defaults (always applied first) ────────────────────────────────
 
-/** Paths outside cwd that are allowed for read operations. */
-const ALLOWED_READ_PATHS = [path.join(os.homedir(), ".agents")];
+const DEFAULT_ALLOWED_FILE_OPERATION_PATHS = ["/tmp", "/private/tmp"];
+const DEFAULT_ALLOWED_READ_PATHS = [path.join(os.homedir(), ".agents")];
+const DEFAULT_ALLOWED_BASH_PATHS = ["/dev/null"];
 
-/** Shell targets outside cwd that are safe without confirmation. */
-const ALLOWED_BASH_PATHS = ["/dev/null"];
+// ── Config loading ──────────────────────────────────────────────────────────
+
+const CONFIG_DIR = path.join(os.homedir(), ".pi", "agent");
+const CONFIG_FILE = path.join(CONFIG_DIR, "safe-coder.json");
+
+interface SafeCoderConfig {
+	allowedReadPaths?: string[];
+	allowedFileOperationPaths?: string[];
+	allowedBashPaths?: string[];
+}
+
+/** Resolve a single path, expanding ~ to home directory. */
+function resolvePath(p: string): string {
+	if (p === "~") return os.homedir();
+	if (p.startsWith("~/")) return path.join(os.homedir(), p.slice(2));
+	if (/^~[^/\\]+/.test(p)) return path.join(path.dirname(os.homedir()), p.slice(1));
+	return p;
+}
+
+/** Merge user config arrays with built-in defaults (defaults first, deduplicated). */
+function mergeArrays(defaults: string[], configValues?: string[]): string[] {
+	const resolved = new Set<string>();
+	for (const d of defaults) resolved.add(resolvePath(d));
+	if (configValues) {
+		for (const c of configValues) resolved.add(resolvePath(c));
+	}
+	return [...resolved];
+}
+
+/** Load and parse the config file, returning null on any error. */
+function loadConfig(): SafeCoderConfig | null {
+	try {
+		const raw = fs.readFileSync(CONFIG_FILE, "utf-8");
+		return JSON.parse(raw) as SafeCoderConfig;
+	} catch {
+		return null;
+	}
+}
+
+// ── Resolved paths (defaults merged with user config) ───────────────────────
+
+const config = loadConfig();
+
+const ALLOWED_FILE_OPERATION_PATHS = mergeArrays(
+	DEFAULT_ALLOWED_FILE_OPERATION_PATHS,
+	config?.allowedFileOperationPaths
+);
+
+const ALLOWED_READ_PATHS = mergeArrays(DEFAULT_ALLOWED_READ_PATHS, config?.allowedReadPaths);
+
+const ALLOWED_BASH_PATHS = mergeArrays(DEFAULT_ALLOWED_BASH_PATHS, config?.allowedBashPaths);
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
 const SHELL_OPERATORS = new Set(["|", "||", "&", "&&", ";", "(", ")", "<", ">"]);
 
@@ -28,7 +83,7 @@ const SHELL_OPERATORS = new Set(["|", "||", "&", "&&", ";", "(", ")", "<", ">"])
 function resolveTargetPath(cwd: string, targetPath: string): string {
 	if (targetPath === "~") return os.homedir();
 	if (targetPath.startsWith("~/")) return path.join(os.homedir(), targetPath.slice(2));
-	if (/^~[^/]+/.test(targetPath)) return path.join(path.dirname(os.homedir()), targetPath.slice(1));
+	if (/^~[^/\\]+/.test(targetPath)) return path.join(path.dirname(os.homedir()), targetPath.slice(1));
 	return path.resolve(cwd, targetPath);
 }
 
@@ -120,7 +175,7 @@ function looksLikeOutsideCwdReference(value: string): boolean {
 	return (
 		value === "~" ||
 		value.startsWith("~/") ||
-		/^~[^/]+/.test(value) ||
+		/^~[^/\\]+/.test(value) ||
 		value.startsWith("/") ||
 		value === ".." ||
 		value.startsWith("../") ||
@@ -150,6 +205,8 @@ function commandTouchesOutsideCwd(cwd: string, command: string): boolean {
 		.flatMap(pathCandidatesFromShellWord)
 		.some((targetPath) => isOutsideCwd(cwd, targetPath) && !isAllowedBashPath(cwd, targetPath));
 }
+
+// ── Extension ───────────────────────────────────────────────────────────────
 
 export default function (pi: ExtensionAPI) {
 	const dangerousPatterns = [/\brm\s+(-rf?|--recursive)/i, /\bsudo\b/i, /\b(chmod|chown)\b.*777/i];

@@ -33,6 +33,48 @@ pi install npm:safe-coder
   - Ships with a `skills/skills.txt` reference that documents how `pi` discovers and uses Agent Skills.
   - Compatible with the [Agent Skills specification](https://agentskills.io/specification).
 
+### Configuration
+
+Safe Coder reads its configuration from `~/.pi/agent/safe-coder.json` at startup. If the file does not exist, built-in defaults are used.
+
+Create the config file to customize allowed paths:
+
+```jsonc
+// ~/.pi/agent/safe-coder.json
+{
+  "allowedReadPaths": [
+    "~/.agents",       // built-in default — shared agent skills
+    "~/.pi/agent",     // pi extensions, docs, skills
+    "C:/Source"        // your source projects
+  ],
+  "allowedFileOperationPaths": [
+    "/tmp",
+    "/private/tmp"
+  ],
+  "allowedBashPaths": [
+    "/dev/null"
+  ]
+}
+```
+
+#### Config fields
+
+| Field | Description | Built-in defaults |
+|-------|-------------|-------------------|
+| `allowedReadPaths` | Paths outside cwd allowed for `read` operations without prompting | `~/.agents` |
+| `allowedFileOperationPaths` | Paths outside cwd allowed for any operation (`read`, `write`, `edit`) without prompting | `/tmp`, `/private/tmp` |
+| `allowedBashPaths` | Shell command arguments that resolve to these paths are considered safe | `/dev/null` |
+
+#### Merge behavior
+
+Config values are **merged with** built-in defaults (defaults first, then your values). You never lose the built-in safe paths by adding your own. Path entries are deduplicated after resolution.
+
+#### Path syntax
+
+- Use absolute paths: `"C:/Source"`, `"/usr/local"`
+- Use `~` for home directory: `"~/.pi/agent"`, `"~/projects"`
+- Paths are resolved and compared as prefixes — any file inside an allowed path is permitted.
+
 ### Project Layout
 
 - `package.json`
@@ -44,6 +86,7 @@ pi install npm:safe-coder
     - `./themes`
 - `extensions/permission-gate.ts`
   - A `pi` extension that listens to `tool_call` events and:
+    - Reads configuration from `~/.pi/agent/safe-coder.json`.
     - Detects dangerous shell commands via regex heuristics.
     - Detects file operations that leave the current working directory.
     - Uses `ctx.ui.select` to ask the user whether to allow or block the call.
@@ -57,7 +100,7 @@ pi install npm:safe-coder
 
 ### Requirements
 
-- Node.js (version compatible with `@mariozechner/pi-coding-agent`).
+- Node.js (version compatible with `@earendil-works/pi-coding-agent`).
 - `pnpm` as package manager (see `packageManager` field in `package.json`).
 - The [`pi` coding agent](https://www.npmjs.com/package/@mariozechner/pi-coding-agent) installed and available on your system.
 
@@ -96,6 +139,7 @@ You will then see:
 
 ### Customization
 
+- **Configure allowed paths** — Edit `~/.pi/agent/safe-coder.json` to add or modify allowed paths. No source code changes needed.
 - **Adjust dangerous patterns**
   - Edit `extensions/permission-gate.ts` to add or refine regex patterns for dangerous commands or external paths.
 - **Change protected paths**
