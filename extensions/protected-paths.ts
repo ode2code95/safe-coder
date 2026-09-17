@@ -10,11 +10,7 @@
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { loadConfig } from "./config-loader.js";
-
-interface SafeCoderConfig {
-	allowedWritePaths?: string[];
-}
+import { loadConfig, type SafeCoderConfig } from "./config-loader.js";
 
 // ── Resolved paths ──────────────────────────────────────────────────────────
 

@@ -43,8 +43,8 @@ Create the config file to customize allowed paths:
 // ~/.pi/agent/safe-coder.json
 {
   "allowedReadPaths": [
-    "~/.pi/agent",     // pi extensions, docs, skills
-    "~/Source"         // your source projects
+    "~/projects",      // your development workspace
+    "~/workspace"      // general document access
   ]
 }
 ```
@@ -56,6 +56,7 @@ Create the config file to customize allowed paths:
 | `allowedReadPaths` | Paths outside cwd allowed for `read` operations without prompting | `~/.agents` |
 | `allowedFileOperationPaths` | Paths outside cwd allowed for any operation (`read`, `write`, `edit`) without prompting | `/tmp`, `/private/tmp` |
 | `allowedBashPaths` | Shell command arguments that resolve to these paths are considered safe | `/dev/null` |
+| `sensitiveFilePatterns` | File name patterns whose content is obfuscated (API keys masked) before reaching the model | `*.env`, `*.pem`, `*.key`, `id_rsa`, `settings.json`, `.aws/credentials`, etc. |
 
 #### Merge behavior
 
@@ -64,8 +65,18 @@ Config values are **merged with** built-in defaults (defaults first, then your v
 #### Path syntax
 
 - Use absolute paths: `"/usr/local"`
-- Use `~` for home directory: `"~/.pi/agent"`, `"~/projects"`
+- Use `~` for home directory: `"~/projects"`, `"~/workspace"`
 - Paths are resolved and compared as prefixes — any file inside an allowed path is permitted.
+
+#### Sensitive file handling
+
+When safe-coder detects a read operation on a sensitive file (matched by `sensitiveFilePatterns`):
+
+1. The file content is read and values matching common API key/token patterns are obfuscated (e.g., `sk-ant-xxxx...xxxx`)
+2. A preview with obfuscated values is shown to the user for approval
+3. If approved, the actual read proceeds — but the model receives the **obfuscated** version
+
+This ensures that even if you explicitly allow reading a credentials file, the model never sees raw secrets. You can always disable this behavior by removing the relevant patterns from `sensitiveFilePatterns`.
 
 ### Project Layout
 

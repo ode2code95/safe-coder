@@ -4,7 +4,7 @@
  *
  * - Prompts for confirmation before potentially dangerous bash commands
  *   (rm -rf, sudo, chmod/chown 777).
- * - Any file operation (read, write, edit) that touches paths outside
+ * - Any tool (read, write, edit, bash) that references paths outside
  *   the current working directory (ctx.cwd, i.e. where pi was started)
  *   requires user authorization.
  *
@@ -15,17 +15,11 @@
 import os from "node:os";
 import path from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { mergeArrays, loadConfig } from "./config-loader.js";
-
-interface SafeCoderConfig {
-	allowedReadPaths?: string[];
-	allowedFileOperationPaths?: string[];
-	allowedBashPaths?: string[];
-}
+import { mergeArrays, loadConfig, type SafeCoderConfig } from "./config-loader.js";
 
 // ── Resolved paths (defaults merged with user config) ───────────────────────
 
-const config = loadConfig();
+const config = loadConfig<SafeCoderConfig>();
 
 const DEFAULT_ALLOWED_FILE_OPERATION_PATHS = ["/tmp", "/private/tmp"];
 const DEFAULT_ALLOWED_READ_PATHS = [path.join(os.homedir(), ".agents")];

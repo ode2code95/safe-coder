@@ -15,6 +15,16 @@ import fs from "node:fs";
 const CONFIG_DIR = path.join(os.homedir(), ".pi", "agent");
 const CONFIG_FILE = path.join(CONFIG_DIR, "safe-coder.json");
 
+/** Shape of ~/.pi/agent/safe-coder.json */
+export interface SafeCoderConfig {
+	allowedReadPaths?: string[];
+	allowedFileOperationPaths?: string[];
+	allowedBashPaths?: string[];
+
+	/** Glob patterns for files whose content may contain API keys or secrets. */
+	sensitiveFilePatterns?: string[];
+}
+
 /** Resolve a single path, expanding ~ to home directory. */
 export function resolvePath(p: string): string {
 	if (p === "~") return os.homedir();
