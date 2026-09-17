@@ -9,56 +9,18 @@
  * See README.md for details.
  */
 
-import os from "node:os";
-import path from "node:path";
-import fs from "node:fs";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-
-// ── Built-in defaults (always applied first) ────────────────────────────────
-
-const DEFAULT_PROTECTED_PATHS = [".env", ".git/", "node_modules/"];
-
-// ── Config loading ──────────────────────────────────────────────────────────
-
-const CONFIG_DIR = path.join(os.homedir(), ".pi", "agent");
-const CONFIG_FILE = path.join(CONFIG_DIR, "safe-coder.json");
+import { loadConfig } from "./config-loader.js";
 
 interface SafeCoderConfig {
 	allowedWritePaths?: string[];
-}
-
-/** Resolve a single path, expanding ~ to home directory. */
-function resolvePath(p: string): string {
-	if (p === "~") return os.homedir();
-	if (p.startsWith("~/")) return path.join(os.homedir(), p.slice(2));
-	if (/^~[^/\\]+/.test(p)) return path.join(path.dirname(os.homedir()), p.slice(1));
-	return p;
-}
-
-/** Merge user config arrays with built-in defaults (defaults first, deduplicated). */
-function mergeArrays(defaults: string[], configValues?: string[]): string[] {
-	const resolved = new Set<string>();
-	for (const d of defaults) resolved.add(resolvePath(d));
-	if (configValues) {
-		for (const c of configValues) resolved.add(resolvePath(c));
-	}
-	return [...resolved];
-}
-
-/** Load and parse the config file, returning null on any error. */
-function loadConfig(): SafeCoderConfig | null {
-	try {
-		const raw = fs.readFileSync(CONFIG_FILE, "utf-8");
-		return JSON.parse(raw) as SafeCoderConfig;
-	} catch {
-		return null;
-	}
 }
 
 // ── Resolved paths ──────────────────────────────────────────────────────────
 
 const config = loadConfig();
 
+const DEFAULT_PROTECTED_PATHS = [".env", ".git/", "node_modules/"];
 const PROTECTED_PATHS = DEFAULT_PROTECTED_PATHS; // Core protections are always enforced
 
 // ── Extension ───────────────────────────────────────────────────────────────
