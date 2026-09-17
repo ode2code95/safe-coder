@@ -4,6 +4,8 @@
  *
  * - Prompts for confirmation before potentially dangerous bash commands
  *   (rm -rf, sudo, chmod/chown 777).
+ * - Flags shell commands when parsed path arguments resolve outside the
+ *   current working directory and asks for confirmation.
  * - Any tool (read, write, edit, bash) that references paths outside
  *   the current working directory (ctx.cwd, i.e. where pi was started)
  *   requires user authorization.

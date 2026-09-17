@@ -140,13 +140,11 @@ You will then see:
 - Confirmation prompts when the assistant attempts potentially dangerous or out-of-bounds commands.
 - Warnings and blocks when the assistant tries to touch protected paths.
 
-### Customization
+### Advanced Customization
+Some customization is not handled by the config file.
 
-- **Configure allowed paths** — Edit `~/.pi/agent/safe-coder.json` to add or modify allowed paths. No source code changes needed.
 - **Adjust dangerous patterns**
-  - Edit `extensions/permission-gate.ts` to add or refine regex patterns for dangerous commands or external paths.
-- **Change protected paths**
-  - Edit `extensions/protected-paths.ts` and update the `protectedPaths` array or the `.env` handling logic.
+  - Edit `extensions/permission-gate.ts` to add or refine regex patterns for dangerous commands.
 - **Add skills**
   - Create new skill directories under `skills/` following the Agent Skills format (each with a `SKILL.md` file and optional scripts/docs).
   - Update descriptions so the assistant knows when to use each skill.
