@@ -43,16 +43,8 @@ Create the config file to customize allowed paths:
 // ~/.pi/agent/safe-coder.json
 {
   "allowedReadPaths": [
-    "~/.agents",       // built-in default — shared agent skills
     "~/.pi/agent",     // pi extensions, docs, skills
-    "C:/Source"        // your source projects
-  ],
-  "allowedFileOperationPaths": [
-    "/tmp",
-    "/private/tmp"
-  ],
-  "allowedBashPaths": [
-    "/dev/null"
+    "~/Source"         // your source projects
   ]
 }
 ```
@@ -71,7 +63,7 @@ Config values are **merged with** built-in defaults (defaults first, then your v
 
 #### Path syntax
 
-- Use absolute paths: `"C:/Source"`, `"/usr/local"`
+- Use absolute paths: `"/usr/local"`
 - Use `~` for home directory: `"~/.pi/agent"`, `"~/projects"`
 - Paths are resolved and compared as prefixes — any file inside an allowed path is permitted.
 
