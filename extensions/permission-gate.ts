@@ -17,7 +17,7 @@
 import os from "node:os";
 import path from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { mergeArrays, loadConfig, type SafeCoderConfig } from "./config-loader.js";
+import { mergeArrays, loadConfig, type SafeCoderConfig } from "../lib/config-loader.ts";
 
 // ── Resolved paths (defaults merged with user config) ───────────────────────
 
