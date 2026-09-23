@@ -14,7 +14,6 @@ import fs from "node:fs";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 
 const CONFIG_FILE = path.join(getAgentDir(), "safe-coder.json");
-const CONFIG_FILE = path.join(CONFIG_DIR, "safe-coder.json");
 
 /** Shape of safe-coder.json */
 export interface SafeCoderConfig {
@@ -49,7 +48,13 @@ export function loadConfig<T>(): T | null {
 	try {
 		const raw = fs.readFileSync(CONFIG_FILE, "utf-8");
 		return JSON.parse(raw) as T;
-	} catch {
+	} catch (err) {
+		if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+		if (err instanceof SyntaxError) {
+			console.error(`safe-coder: ${CONFIG_FILE} exists but is not valid JSON.`);
+			return null;
+		}
+		console.error(`safe-coder: failed to read ${CONFIG_FILE}:`, err);
 		return null;
 	}
 }
