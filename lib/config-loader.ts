@@ -11,11 +11,12 @@
 import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 
-const CONFIG_DIR = path.join(os.homedir(), ".pi", "agent");
+const CONFIG_FILE = path.join(getAgentDir(), "safe-coder.json");
 const CONFIG_FILE = path.join(CONFIG_DIR, "safe-coder.json");
 
-/** Shape of ~/.pi/agent/safe-coder.json */
+/** Shape of safe-coder.json */
 export interface SafeCoderConfig {
 	allowedReadPaths?: string[];
 	allowedFileOperationPaths?: string[];
