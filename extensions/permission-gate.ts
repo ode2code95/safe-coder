@@ -48,17 +48,20 @@ function resolveTargetPath(cwd: string, targetPath: string): string {
 	return path.resolve(cwd, targetPath);
 }
 
+/** Resolve a path and normalize to lowercase for case-insensitive comparison. */
+function resolvePathLower(p: string): string {
+	return path.resolve(p).toLowerCase();
+}
+
 /** True if targetPath is the same as basePath or inside it. */
 function isSameOrInsidePath(basePath: string, targetPath: string): boolean {
-	const resolvedBase = path.resolve(basePath);
-	const resolvedTarget = path.resolve(targetPath);
-	const rel = path.relative(resolvedBase, resolvedTarget);
+	const rel = path.relative(resolvePathLower(basePath), resolvePathLower(targetPath));
 	return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
 }
 
 /** True if targetPath, when resolved against cwd, is outside cwd. */
 function isOutsideCwd(cwd: string, targetPath: string): boolean {
-	const rel = path.relative(cwd, resolveTargetPath(cwd, targetPath));
+	const rel = path.relative(resolvePathLower(cwd), resolvePathLower(resolveTargetPath(cwd, targetPath)));
 	return rel.startsWith("..") || path.isAbsolute(rel);
 }
 
@@ -157,8 +160,8 @@ function pathCandidatesFromShellWord(word: string): string[] {
 }
 
 function isAllowedBashPath(cwd: string, targetPath: string): boolean {
-	const resolved = resolveTargetPath(cwd, targetPath);
-	return ALLOWED_BASH_PATHS.some((allowed) => path.resolve(allowed) === resolved);
+	const resolved = resolvePathLower(resolveTargetPath(cwd, targetPath));
+	return ALLOWED_BASH_PATHS.some((allowed) => resolvePathLower(allowed) === resolved);
 }
 
 function commandTouchesOutsideCwd(cwd: string, command: string): boolean {
